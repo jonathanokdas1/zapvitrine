@@ -67,7 +67,7 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
 
                     {store.products.length === 0 && (
                         <div className="text-center text-slate-500 py-10">
-                            Nenhum produto disponível no momento.
+                            Nenhum produto disponível.
                         </div>
                     )}
                 </div>
