@@ -58,13 +58,64 @@ export function SettingsForm({ user }: { user: any }) {
     // Parse existing address if full
     React.useEffect(() => {
         if (user.location?.address_text && user.location.address_text.includes(",")) {
-            // Very basic parsing attempt, user might need to correct
-            // Format: Street, Number - Complement - Neighborhood, City - CEP: ...
-            // This is brittle, so we only do a best effort if fields are empty
-            // Ideally we would have stored these separately.
-            // For now, we rely on user input or previous state if we had separate fields (which we don't in DB yet)
+            // Format: Street, Number [- Complement] - Neighborhood, City - CEP: ...
+            // Example: "Rua A, 123 - Apto 1 - Centro, Cidade - CEP: 00000-000"
+            // or: "Rua A, 123 - Centro, Cidade - CEP: 00000-000"
+
+            try {
+                const text = user.location.address_text
+
+                // Extract CEP first
+                const cepMatch = text.match(/CEP: (\d{5}-\d{3})/)
+                if (cepMatch) {
+                    setCep(cepMatch[1])
+                }
+
+                // Remove CEP part
+                const addressPart = text.split(" - CEP:")[0] // "Rua A, 123 - Apto 1 - Centro, Cidade"
+
+                // Split by comma to get Street and the rest
+                const firstCommaIndex = addressPart.indexOf(",")
+                if (firstCommaIndex !== -1) {
+                    const streetVal = addressPart.substring(0, firstCommaIndex).trim()
+                    setStreet(streetVal)
+
+                    // "123 - Apto 1 - Centro, Cidade"
+                    const rest = addressPart.substring(firstCommaIndex + 1).trim()
+
+                    // The last part after the last comma is the City
+                    const lastCommaIndex = rest.lastIndexOf(",")
+                    if (lastCommaIndex !== -1) {
+                        // const cityVal = rest.substring(lastCommaIndex + 1).trim()
+                        // setCity(cityVal) // City is already set from user.location.city.name usually, but we can ensure it matches? 
+                        // Actually city comes from the relation, so we might not need to parse it from text if we trust the relation.
+
+                        // "123 - Apto 1 - Centro"
+                        const numberAndNeighborhood = rest.substring(0, lastCommaIndex).trim()
+
+                        // Split by " - "
+                        const parts = numberAndNeighborhood.split(" - ")
+                        // parts[0] is Number
+                        // parts[last] is Neighborhood
+                        // Middle parts are Complement
+
+                        if (parts.length >= 2) {
+                            setAddressNumber(parts[0])
+                            setNeighborhood(parts[parts.length - 1])
+
+                            if (parts.length > 2) {
+                                setAddressComplement(parts.slice(1, parts.length - 1).join(" - "))
+                            }
+                        } else if (parts.length === 1) {
+                            setAddressNumber(parts[0])
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing address", e)
+            }
         }
-    }, [])
+    }, [user.location?.address_text])
 
     // Schedule State
     const defaultSchedule = {
@@ -426,7 +477,8 @@ export function SettingsForm({ user }: { user: any }) {
                                         defaultValue={user.phone || ""}
                                         placeholder="(99) 9 9999-9999"
                                         required
-                                        disabled={!isEditingSensitive}
+                                        readOnly={!isEditingSensitive}
+                                        tabIndex={!isEditingSensitive ? -1 : 0}
                                         onChange={(e) => e.target.value = formatPhone(e.target.value)}
                                     />
                                 </div>
