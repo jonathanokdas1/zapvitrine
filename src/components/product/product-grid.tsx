@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Product, User } from "@prisma/client"
+import { User } from "@prisma/client"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,16 @@ import { formatCurrency } from "@/lib/utils"
 import { VariantSelector, Variant } from "./variant-selector"
 import { useCart } from "@/components/cart/cart-context"
 import { Plus, Minus } from "lucide-react"
+
+interface Product {
+    id: string
+    title: string
+    description: string | null
+    price: number
+    promo_price: number | null
+    images: string | null
+    variants: string | null
+}
 
 interface ProductGridProps {
     products: Product[]
@@ -121,10 +131,17 @@ export function ProductGrid({ products, store }: ProductGridProps) {
             variants: variantDetails,
             storeId: store.id,
             storeName: store.name,
-            storePhone: store.phone || ""
+            storePhone: store.phone || "",
+            storeType: store.store_type || "RETAIL"
         })
 
         setIsModalOpen(false)
+    }
+
+    const getButtonText = () => {
+        if (store.store_type === "SERVICE") return "Solicitar Horário"
+        if (store.store_type === "FOOD") return "Fazer Pedido"
+        return "Adicionar à Sacola"
     }
 
     return (
@@ -164,7 +181,9 @@ export function ProductGrid({ products, store }: ProductGridProps) {
                             <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" variant="secondary">Adicionar</Button>
+                            <Button className="w-full" variant="secondary">
+                                {store.store_type === "SERVICE" ? "Agendar" : "Adicionar"}
+                            </Button>
                         </CardFooter>
                     </Card>
                 ))}
@@ -224,7 +243,7 @@ export function ProductGrid({ products, store }: ProductGridProps) {
                                     </div>
                                 </div>
                                 <Button className="w-full h-12 text-lg" onClick={handleAddToCart}>
-                                    Adicionar à Sacola
+                                    {getButtonText()}
                                 </Button>
                             </DialogFooter>
                         </>
@@ -233,4 +252,5 @@ export function ProductGrid({ products, store }: ProductGridProps) {
             </Dialog>
         </>
     )
+
 }

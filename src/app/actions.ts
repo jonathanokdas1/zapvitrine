@@ -3,8 +3,11 @@
 import { PrismaClient } from "@prisma/client"
 import { redirect } from "next/navigation"
 import { z } from "zod"
+import { login as authLogin, getSession } from "@/lib/auth"
 
 const prisma = new PrismaClient()
+
+import { validateCPF } from "@/lib/validators"
 
 const registerSchema = z.object({
     name: z.string().min(3),
@@ -13,7 +16,7 @@ const registerSchema = z.object({
     storeName: z.string().min(3),
     storeSlug: z.string().min(3).regex(/^[a-z0-9-]+$/),
     cityId: z.string().min(1),
-    phone: z.string().min(10),
+    phone: z.string().min(14), // (99) 9 9999-9999 is 16 chars, but min 14 covers basic
     document: z.string().min(11),
 })
 
@@ -37,29 +40,40 @@ export async function registerStore(prevState: any, formData: FormData) {
 
     const { name, email, password, storeName, storeSlug, cityId, phone, document } = result.data
 
+    // Validate CPF
+    const cleanCPF = document.replace(/[^\d]+/g, '')
+    if (!validateCPF(cleanCPF)) {
+        return { error: "CPF inválido." }
+    }
+
     try {
-        // Check if email or slug exists
+        // Check if email, slug or phone exists
         const existingUser = await prisma.user.findFirst({
             where: {
                 OR: [
                     { email },
-                    { slug: storeSlug }
+                    { slug: storeSlug },
+                    { phone }
                 ]
             }
         })
 
         if (existingUser) {
-            return { error: "Email ou Link da Loja já existem." }
+            if (existingUser.email === email) return { error: "Email já cadastrado." }
+            if (existingUser.slug === storeSlug) return { error: "Link da loja já existe." }
+            if (existingUser.phone === phone) return { error: "WhatsApp já cadastrado." }
+            return { error: "Usuário já existe." }
         }
 
-        await prisma.user.create({
+        const newUser = await prisma.user.create({
             data: {
                 email,
                 password_hash: password, // In real app, hash this!
                 name: storeName,
+                owner_name: name,
                 slug: storeSlug,
                 phone,
-                document,
+                document: cleanCPF, // Save clean CPF
                 plan: {
                     create: { plan: "FREE" }
                 },
@@ -72,7 +86,7 @@ export async function registerStore(prevState: any, formData: FormData) {
                 business: {
                     create: {
                         category: "RETAIL",
-                        is_open: false
+                        is_open: true
                     }
                 },
                 metrics: {
@@ -80,6 +94,9 @@ export async function registerStore(prevState: any, formData: FormData) {
                 }
             }
         })
+
+        // Login after register
+        await authLogin(newUser.id)
 
     } catch (e) {
         console.error(e)
@@ -106,8 +123,7 @@ export async function login(prevState: any, formData: FormData) {
             return { error: "Email ou senha inválidos." }
         }
 
-        // In a real app, set a session cookie here.
-        // For MVP, we just redirect.
+        await authLogin(user.id)
 
     } catch (error) {
         console.error(error)
@@ -120,14 +136,14 @@ export async function login(prevState: any, formData: FormData) {
 export async function createProduct(formData: FormData) {
     const title = formData.get("title") as string
     const description = formData.get("description") as string
-    const price = parseFloat(formData.get("price") as string) * 100 // Convert to cents
-    const promo_price = formData.get("promo_price") ? parseFloat(formData.get("promo_price") as string) * 100 : null
+    const price = BigInt(Math.round(parseFloat(formData.get("price") as string) * 100)) // Convert to cents BigInt
+    const promo_price_raw = formData.get("promo_price")
+    const promo_price = promo_price_raw ? BigInt(Math.round(parseFloat(promo_price_raw as string) * 100)) : null
     const images = formData.get("images") as string
     const variants = formData.get("variants") as string
 
-    // Mock user ID for MVP
-    const user = await prisma.user.findFirst()
-    if (!user) throw new Error("No user found")
+    const session = await getSession()
+    if (!session) redirect('/login')
 
     await prisma.product.create({
         data: {
@@ -137,7 +153,42 @@ export async function createProduct(formData: FormData) {
             promo_price,
             images,
             variants,
-            userId: user.id
+            userId: session.userId
         }
     })
+
+    redirect('/admin/products?success=true')
+}
+
+export async function updateProduct(formData: FormData) {
+    const id = formData.get("id") as string
+    const title = formData.get("title") as string
+    const description = formData.get("description") as string
+    const price = BigInt(Math.round(parseFloat(formData.get("price") as string) * 100))
+    const promo_price_raw = formData.get("promo_price")
+    const promo_price = promo_price_raw ? BigInt(Math.round(parseFloat(promo_price_raw as string) * 100)) : null
+    const images = formData.get("images") as string
+    const variants = formData.get("variants") as string
+
+    const session = await getSession()
+    if (!session) redirect('/login')
+
+    const product = await prisma.product.findUnique({ where: { id } })
+    if (!product || product.userId !== session.userId) {
+        throw new Error("Unauthorized")
+    }
+
+    await prisma.product.update({
+        where: { id },
+        data: {
+            title,
+            description,
+            price,
+            promo_price,
+            images,
+            variants
+        }
+    })
+
+    redirect('/admin/products?success=true')
 }

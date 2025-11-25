@@ -5,13 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Plus, Edit, Trash2, AlertTriangle, ExternalLink, Eye, EyeOff } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
-import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { deleteProduct } from "@/actions/dashboard"
+import { ProductStatusToggle } from "@/components/product-status-toggle"
 
 const prisma = new PrismaClient()
 
+import { getSession } from "@/lib/auth"
+import { redirect } from "next/navigation"
+import { revalidatePath } from "next/cache"
+
 async function getUserData() {
-    const user = await prisma.user.findFirst({
+    const session = await getSession()
+    if (!session) return null
+
+    const user = await prisma.user.findUnique({
+        where: { id: session.userId },
         include: {
             products: true,
             plan: true,
@@ -26,12 +35,12 @@ export default async function ProductsPage() {
 
     if (!user) return <div>Carregando...</div>
 
-    const isProfileComplete =
-        user.phone &&
-        user.slug &&
-        user.logo_url &&
-        user.description &&
-        user.business?.opening_hours
+    const missingFields = []
+    if (!user.logo_url) missingFields.push("Logo")
+    if (!user.phone) missingFields.push("WhatsApp")
+    if (!user.opening_hours) missingFields.push("Horários")
+
+    const isProfileComplete = missingFields.length === 0
 
     const isFreePlan = user.plan?.plan === 'FREE'
 
@@ -43,11 +52,6 @@ export default async function ProductsPage() {
                     <p className="text-muted-foreground">Gerencie o cardápio da sua loja.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link href={`/${user.slug}`} target="_blank">
-                        <Button variant="outline">
-                            <ExternalLink className="w-4 h-4 mr-2" /> Minha Loja
-                        </Button>
-                    </Link>
                     {isProfileComplete ? (
                         <Link href="/admin/products/new">
                             <Button>
@@ -67,7 +71,7 @@ export default async function ProductsPage() {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Cadastro Incompleto</AlertTitle>
                     <AlertDescription>
-                        Para criar produtos, termine de configurar sua loja (Logo, Descrição, Horários) na aba Configurações.
+                        Para criar produtos, preencha: <strong>{missingFields.join(", ")}</strong> na aba Configurações.
                         <div className="mt-4">
                             <Link href="/admin/settings">
                                 <Button variant="outline" className="border-red-300 hover:bg-red-100">
@@ -79,18 +83,7 @@ export default async function ProductsPage() {
                 </Alert>
             )}
 
-            {isFreePlan && (
-                <Alert className="bg-blue-50 border-blue-200 text-blue-800">
-                    <AlertTriangle className="h-4 w-4 text-blue-800" />
-                    <AlertTitle>Plano Grátis</AlertTitle>
-                    <AlertDescription>
-                        Você está no plano Grátis. Limite de 1 imagem por produto.
-                        <Link href="/admin/upgrade" className="font-bold underline ml-1">
-                            Faça Upgrade para PRO
-                        </Link>
-                    </AlertDescription>
-                </Alert>
-            )}
+
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {user.products.length === 0 && (
@@ -141,19 +134,21 @@ export default async function ProductsPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="flex justify-between items-center mt-2">
-                                <div className="flex items-center gap-2">
-                                    <Switch checked={product.is_active} />
-                                    <span className="text-sm text-muted-foreground">
-                                        {product.is_active ? "Ativo" : "Inativo"}
-                                    </span>
-                                </div>
+                                <ProductStatusToggle productId={product.id} isActive={product.is_active} />
                                 <div className="flex gap-2">
-                                    <Button variant="outline" size="icon">
-                                        <Edit className="w-4 h-4" />
-                                    </Button>
-                                    <Button variant="outline" size="icon" className="text-red-500 hover:text-red-600">
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    <Link href={`/admin/products/${product.id}`}>
+                                        <Button variant="outline" size="icon">
+                                            <Edit className="w-4 h-4" />
+                                        </Button>
+                                    </Link>
+                                    <form action={async () => {
+                                        "use server"
+                                        await deleteProduct(product.id)
+                                    }}>
+                                        <Button variant="outline" size="icon" className="text-red-500 hover:text-red-600">
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </form>
                                 </div>
                             </div>
                         </CardContent>

@@ -12,6 +12,7 @@ export interface CartItem {
     storeId: string
     storeName: string
     storePhone: string
+    storeType: string
 }
 
 interface CartContextType {
@@ -50,7 +51,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setItems(prev => {
             // Check if adding from a different store
             if (prev.length > 0 && prev[0].storeId !== newItem.storeId) {
-                if (!confirm(`Your cart contains items from ${prev[0].storeName}. Clear cart to add items from ${newItem.storeName}?`)) {
+                if (!confirm(`Seu carrinho contém itens de ${prev[0].storeName}. Deseja limpar o carrinho para adicionar itens de ${newItem.storeName}?`)) {
                     return prev
                 }
                 return [newItem]

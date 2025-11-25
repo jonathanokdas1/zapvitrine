@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2, Upload } from "lucide-react"
-import { createProduct } from "@/app/actions"
+import { createProduct, updateProduct } from "@/app/actions"
 
 interface VariantOption {
     label: string
@@ -22,14 +22,19 @@ interface Variant {
     options: VariantOption[]
 }
 
-export function ProductForm() {
+export function ProductForm({ plan, product }: { plan: string, product?: any }) {
     const router = useRouter()
     const [loading, setLoading] = React.useState(false)
-    const [images, setImages] = React.useState<string[]>([])
-    const [variants, setVariants] = React.useState<Variant[]>([])
+    const [images, setImages] = React.useState<string[]>(product ? JSON.parse(product.images) : [])
+    const [variants, setVariants] = React.useState<Variant[]>(product ? JSON.parse(product.variants) : [])
+
+    const isFreePlan = plan === "FREE"
+    const canUpload = !isFreePlan || images.length < 1
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return
+        if (!canUpload) return
+
         setLoading(true)
         const formData = new FormData()
         formData.append("file", e.target.files[0])
@@ -93,15 +98,22 @@ export function ProductForm() {
         formData.append("images", JSON.stringify(images))
         formData.append("variants", JSON.stringify(variants))
 
+        if (product) {
+            formData.append("id", product.id)
+        }
+
         try {
-            await createProduct(formData)
-            router.push("/admin/products")
-            router.refresh()
+            if (product) {
+                await updateProduct(formData)
+            } else {
+                await createProduct(formData)
+            }
         } catch (error) {
             console.error(error)
-            alert("Failed to create product")
-        } finally {
-            setLoading(false)
+            if (!(error as Error).message.includes("NEXT_REDIRECT")) {
+                alert("Failed to save product")
+                setLoading(false)
+            }
         }
     }
 
@@ -109,27 +121,42 @@ export function ProductForm() {
         <form onSubmit={handleSubmit} className="space-y-8 max-w-3xl">
             <Card>
                 <CardHeader>
-                    <CardTitle>Basic Information</CardTitle>
+                    <CardTitle>{product ? "Edit Product" : "Basic Information"}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="title">Product Title</Label>
-                        <Input id="title" name="title" required placeholder="e.g. X-Bacon" />
+                        <Input id="title" name="title" required placeholder="e.g. X-Bacon" defaultValue={product?.title} />
                     </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Description</Label>
-                        <Textarea id="description" name="description" placeholder="Describe your product..." />
+                        <Textarea id="description" name="description" placeholder="Describe your product..." defaultValue={product?.description} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="price">Price (R$)</Label>
-                            <Input id="price" name="price" type="number" step="0.01" required placeholder="0.00" />
+                            <Input
+                                id="price"
+                                name="price"
+                                type="number"
+                                step="0.01"
+                                required
+                                placeholder="0.00"
+                                defaultValue={product ? Number(product.price) / 100 : ""}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="promo_price">Promo Price (Optional)</Label>
-                            <Input id="promo_price" name="promo_price" type="number" step="0.01" placeholder="0.00" />
+                            <Input
+                                id="promo_price"
+                                name="promo_price"
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                defaultValue={product?.promo_price ? Number(product.promo_price) / 100 : ""}
+                            />
                         </div>
                     </div>
                 </CardContent>
@@ -140,6 +167,11 @@ export function ProductForm() {
                     <CardTitle>Images</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {!canUpload && (
+                        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-md text-sm">
+                            Free Plan limit reached (1 image). Upgrade to PRO for more.
+                        </div>
+                    )}
                     <div className="flex flex-wrap gap-4">
                         {images.map((url, i) => (
                             <div key={i} className="relative w-24 h-24 border rounded-lg overflow-hidden">
@@ -153,11 +185,13 @@ export function ProductForm() {
                                 </button>
                             </div>
                         ))}
-                        <label className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
-                            <Upload className="w-6 h-6 text-gray-400" />
-                            <span className="text-xs text-gray-500 mt-1">Upload</span>
-                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={loading} />
-                        </label>
+                        {canUpload && (
+                            <label className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50">
+                                <Upload className="w-6 h-6 text-gray-400" />
+                                <span className="text-xs text-gray-500 mt-1">Upload</span>
+                                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={loading} />
+                            </label>
+                        )}
                     </div>
                 </CardContent>
             </Card>

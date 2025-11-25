@@ -35,6 +35,11 @@ export function CityCombobox() {
 
     React.useEffect(() => {
         setMounted(true)
+        const savedCitySlug = localStorage.getItem("zap_city_slug")
+        const savedCityName = localStorage.getItem("zap_city_name")
+        if (savedCitySlug && savedCityName) {
+            setValue(savedCityName)
+        }
     }, [])
 
     const handleSearch = async (query: string) => {
@@ -51,6 +56,14 @@ export function CityCombobox() {
         }
     }
 
+    const handleSelect = (city: City) => {
+        setValue(city.name)
+        setOpen(false)
+        localStorage.setItem("zap_city_slug", city.slug)
+        localStorage.setItem("zap_city_name", city.name)
+        router.push(`/${city.slug}`)
+    }
+
     if (!mounted) {
         return (
             <Button
@@ -59,7 +72,7 @@ export function CityCombobox() {
                 className="w-[300px] justify-between text-lg h-12 opacity-50 cursor-not-allowed"
                 disabled
             >
-                Carregando...
+                Selecione sua cidade...
             </Button>
         )
     }
@@ -74,7 +87,7 @@ export function CityCombobox() {
                     className="w-[300px] justify-between text-lg h-12"
                 >
                     {value
-                        ? cities.find((city) => city.slug === value)?.name || value
+                        ? value
                         : "Selecione sua cidade..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -93,11 +106,7 @@ export function CityCombobox() {
                                 <CommandItem
                                     key={city.slug}
                                     value={city.slug}
-                                    onSelect={() => {
-                                        setValue(city.name)
-                                        setOpen(false)
-                                        router.push(`/city/${city.slug}`)
-                                    }}
+                                    onSelect={() => handleSelect(city)}
                                 >
                                     <Check
                                         className={cn(

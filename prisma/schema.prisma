@@ -22,11 +22,21 @@ model User {
   
   // Profile
   name          String    // Store Name
+  owner_name    String?   // Personal Name
   slug          String    @unique
   logo_url      String?
   description   String?
   phone         String?   // WhatsApp
   document      String?   // CPF/CNPJ
+  category      String?   // Enum: FOOD, SERVICE, RETAIL (Legacy, keeping for safety)
+  category_slug String?
+  store_type    String?   // Enum: FOOD, RETAIL, SERVICE
+  opening_hours String?
+  address_text  String?
+  
+  // Metrics
+  views           Int @default(0)
+  clicks_whatsapp Int @default(0)
   
   // Relations
   location      Location?
@@ -51,7 +61,9 @@ model Location {
 model Business {
   id            String  @id @default(cuid())
   category      String  // Enum: FOOD, SERVICE, RETAIL (Stored as string for SQLite simplicity or use native Enum if preferred, keeping string for flexibility)
+  consumption_mode String? // Enum: DELIVERY, PICKUP, BOTH, DINE_IN
   opening_hours String?
+  schedule      String? // JSON: { "monday": { "start": "09:00", "end": "18:00", "isOpen": true }, ... }
   is_open       Boolean @default(false)
   userId        String  @unique
   user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -75,8 +87,8 @@ model Product {
   id          String   @id @default(cuid())
   title       String
   description String?
-  price       Int      // Base price in cents
-  promo_price Int?     // Nullable
+  price       BigInt      // Base price in cents
+  promo_price BigInt?     // Nullable
   images      String   // JSON array of URLs
   variants    String   // JSON: [{ name: "Size", type: "SELECT", options: [...] }]
   is_active   Boolean  @default(true)

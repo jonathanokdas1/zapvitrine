@@ -1,14 +1,37 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CitySelect } from "@/components/city-select"
 import { registerStore } from "@/app/actions"
+import { formatCPF, formatPhone, validateCPF } from "@/lib/validators"
 
 export function RegisterForm() {
     const [state, formAction, isPending] = useActionState(registerStore, null)
+    const [phone, setPhone] = useState("")
+    const [cpf, setCpf] = useState("")
+    const [cpfError, setCpfError] = useState("")
+
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setPhone(formatPhone(e.target.value))
+    }
+
+    const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const formatted = formatCPF(e.target.value)
+        setCpf(formatted)
+
+        if (formatted.length === 14) {
+            if (!validateCPF(formatted)) {
+                setCpfError("CPF inválido")
+            } else {
+                setCpfError("")
+            }
+        } else {
+            setCpfError("")
+        }
+    }
 
     return (
         <form action={formAction} className="space-y-4">
@@ -57,17 +80,35 @@ export function RegisterForm() {
 
                     <div className="space-y-2">
                         <Label htmlFor="phone">WhatsApp</Label>
-                        <Input id="phone" name="phone" placeholder="5511999999999" required />
+                        <Input
+                            id="phone"
+                            name="phone"
+                            placeholder="(11) 9 9999-9999"
+                            required
+                            value={phone}
+                            onChange={handlePhoneChange}
+                            maxLength={16}
+                        />
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="document">CPF / CNPJ</Label>
-                        <Input id="document" name="document" placeholder="000.000.000-00" required />
+                        <Label htmlFor="document">CPF</Label>
+                        <Input
+                            id="document"
+                            name="document"
+                            placeholder="000.000.000-00"
+                            required
+                            value={cpf}
+                            onChange={handleCpfChange}
+                            maxLength={14}
+                            className={cpfError ? "border-red-500" : ""}
+                        />
+                        {cpfError && <p className="text-xs text-red-500">{cpfError}</p>}
                     </div>
                 </div>
             </div>
 
-            <Button type="submit" className="w-full mt-6" disabled={isPending}>
+            <Button type="submit" className="w-full mt-6" disabled={isPending || !!cpfError}>
                 {isPending ? "Criando..." : "Criar Loja"}
             </Button>
         </form>

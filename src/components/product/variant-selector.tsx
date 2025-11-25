@@ -38,8 +38,12 @@ export function VariantSelector({ variants, selectedOptions, onOptionChange }: V
                             {variant.options
                                 .filter(option => option.label && option.label.trim() !== "")
                                 .map((option, oIndex) => (
-                                    <div key={`${variant.name}-${option.label}-${oIndex}`} className="flex items-center justify-between space-x-2 border p-3 rounded-lg cursor-pointer hover:bg-gray-50">
-                                        <div className="flex items-center space-x-2">
+                                    <div
+                                        key={`${variant.name}-${option.label}-${oIndex}`}
+                                        className="flex items-center justify-between space-x-2 border p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                                        onClick={() => onOptionChange(variant.name, option.label, false)}
+                                    >
+                                        <div className="flex items-center space-x-2 pointer-events-none">
                                             <RadioGroupItem value={option.label} id={`${variant.name}-${option.label}-${oIndex}`} />
                                             <Label htmlFor={`${variant.name}-${option.label}-${oIndex}`} className="cursor-pointer">
                                                 {option.label}
@@ -60,8 +64,12 @@ export function VariantSelector({ variants, selectedOptions, onOptionChange }: V
                                 .map((option, oIndex) => {
                                     const isChecked = (selectedOptions[variant.name] as string[] || []).includes(option.label)
                                     return (
-                                        <div key={`${variant.name}-${option.label}-${oIndex}`} className="flex items-center justify-between space-x-2 border p-3 rounded-lg cursor-pointer hover:bg-gray-50">
-                                            <div className="flex items-center space-x-2">
+                                        <div
+                                            key={`${variant.name}-${option.label}-${oIndex}`}
+                                            className="flex items-center justify-between space-x-2 border p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                                            onClick={() => onOptionChange(variant.name, option.label, true, !isChecked)}
+                                        >
+                                            <div className="flex items-center space-x-2 pointer-events-none">
                                                 <Checkbox
                                                     id={`${variant.name}-${option.label}-${oIndex}`}
                                                     checked={isChecked}

@@ -88,7 +88,8 @@ export function CheckoutDrawer() {
             items,
             total,
             customerName,
-            address: fullAddress
+            address: fullAddress,
+            storePhone: items[0]?.storePhone || ""
         }
 
         const message = createWhatsAppMessage(orderDetails)
@@ -122,14 +123,14 @@ export function CheckoutDrawer() {
             <SheetContent className="w-full sm:max-w-md flex flex-col h-full">
                 <SheetHeader>
                     <SheetTitle>
-                        {step === 1 ? "Sua Sacola" : "Finalizar Pedido"}
+                        {step === 1 ? (items[0]?.storeType === "SERVICE" ? "Seus Agendamentos" : "Sua Sacola") : "Finalizar Pedido"}
                     </SheetTitle>
                 </SheetHeader>
 
                 <div className="flex-1 overflow-y-auto py-4">
                     {items.length === 0 ? (
                         <div className="text-center text-muted-foreground mt-10">
-                            Sua sacola está vazia.
+                            {items[0]?.storeType === "SERVICE" ? "Nenhum serviço selecionado." : "Sua sacola está vazia."}
                         </div>
                     ) : (
                         <>
@@ -259,7 +260,7 @@ export function CheckoutDrawer() {
                                     <ArrowLeft className="h-4 w-4" />
                                 </Button>
                                 <Button className="flex-1 h-12 text-lg bg-green-600 hover:bg-green-700" onClick={handleCheckout}>
-                                    Enviar Pedido no Zap
+                                    {items[0]?.storeType === "SERVICE" ? "Solicitar Agendamento" : "Enviar Pedido no Zap"}
                                 </Button>
                             </div>
                         )}

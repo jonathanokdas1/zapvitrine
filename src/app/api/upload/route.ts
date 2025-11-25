@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const filename = `${Date.now()}_${file.name.replace(/\s/g, "_")}`.split('.')[0] + ".webp"
+    // Create a unique filename
+    const filename = `${Date.now()}_${file.name.replace(/\s/g, "_").split('.')[0]}.webp`
 
     try {
         const subDir = type === 'logo' ? 'logos' : 'products'

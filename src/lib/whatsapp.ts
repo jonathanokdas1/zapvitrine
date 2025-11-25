@@ -1,8 +1,11 @@
+import { formatCurrency } from "@/lib/utils"
+
 export interface CartItem {
     title: string
     quantity: number
     price: number
     variants?: string[]
+    storeType?: string
 }
 
 export interface OrderDetails {
@@ -16,15 +19,16 @@ export interface OrderDetails {
 
 export function createWhatsAppMessage(order: OrderDetails): string {
     const { storeName, items, total, address, customerName } = order
+    const isService = items[0]?.storeType === "SERVICE"
 
-    let message = `*New Order for ${storeName}*\n\n`
+    let message = `*${isService ? "Novo Agendamento" : "Novo Pedido"} para ${storeName}*\n\n`
 
     if (customerName) {
-        message += `Customer: ${customerName}\n`
+        message += `Cliente: ${customerName}\n`
     }
-    message += `Address: ${address}\n\n`
+    message += `Endereço: ${address}\n\n`
 
-    message += `*Items:*\n`
+    message += `*${isService ? "Serviços" : "Itens"}:*\n`
     items.forEach(item => {
         message += `${item.quantity}x ${item.title}`
         if (item.variants && item.variants.length > 0) {
@@ -33,7 +37,7 @@ export function createWhatsAppMessage(order: OrderDetails): string {
         message += `\n`
     })
 
-    message += `\n*Total: R$ ${(total / 100).toFixed(2).replace('.', ',')}*`
+    message += `\n*Total: ${formatCurrency(total)}*`
 
     return encodeURIComponent(message)
 }

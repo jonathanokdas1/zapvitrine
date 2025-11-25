@@ -1,11 +1,9 @@
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "@/lib/prisma"
 import { CityCombobox } from "@/components/city-combobox"
 import Link from "next/link"
 import { Store, MapPin, Star } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-
-const prisma = new PrismaClient()
 
 async function getCities() {
     return await prisma.city.findMany({
@@ -33,11 +31,14 @@ async function getFeaturedStores() {
     })
 }
 
+import { CityRedirect } from "@/components/city-redirect"
+
 export default async function Home() {
     const featuredStores = await getFeaturedStores()
 
     return (
         <div className="min-h-screen flex flex-col">
+            <CityRedirect />
             {/* Header / Hero */}
             <header className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-20 px-4">
                 <div className="container mx-auto flex flex-col items-center text-center">
@@ -62,7 +63,7 @@ export default async function Home() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {featuredStores.map((store) => (
-                        <Link href={`/${store.slug}`} key={store.id} className="group">
+                        <Link href={`/${store.location?.city.slug}/${store.slug}`} key={store.id} className="group">
                             <Card className="h-full hover:shadow-lg transition-shadow duration-200 border-none shadow-md overflow-hidden">
                                 <div className="h-32 bg-gray-100 flex items-center justify-center relative">
                                     {store.logo_url ? (

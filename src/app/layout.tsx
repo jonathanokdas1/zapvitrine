@@ -1,10 +1,11 @@
-"use client"
+
 
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/components/cart/cart-context";
 import { CheckoutDrawer } from "@/components/cart/checkout-drawer";
-import { usePathname } from "next/navigation";
+import { Toaster } from "@/components/ui/sonner";
+import { headers } from "next/headers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,13 +17,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
-  const isAdmin = pathname?.startsWith("/admin");
+  const headersList = await headers();
+  const pathname = headersList.get("x-invoke-path") || "";
+  const shouldHideCart = pathname.startsWith("/admin") || pathname.startsWith("/login") || pathname.startsWith("/register");
 
   return (
     <html lang="pt-BR">
@@ -31,7 +33,8 @@ export default function RootLayout({
       >
         <CartProvider>
           {children}
-          {!isAdmin && <CheckoutDrawer />}
+          {!shouldHideCart && <CheckoutDrawer />}
+          <Toaster />
         </CartProvider>
       </body>
     </html>
