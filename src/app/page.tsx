@@ -4,12 +4,7 @@ import Link from "next/link"
 import { Store, MapPin, Star } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-
-async function getCities() {
-    return await prisma.city.findMany({
-        orderBy: { name: 'asc' }
-    })
-}
+import { CityRedirect } from "@/components/city-redirect"
 
 async function getFeaturedStores() {
     // Mock logic: fetch random stores. In real app, use metrics or ratings.
@@ -17,7 +12,8 @@ async function getFeaturedStores() {
         where: {
             business: {
                 is_open: true
-            }
+            },
+            emailVerified: { not: null }
         },
         take: 6,
         include: {
@@ -31,8 +27,6 @@ async function getFeaturedStores() {
     })
 }
 
-import { CityRedirect } from "@/components/city-redirect"
-
 export default async function Home() {
     const featuredStores = await getFeaturedStores()
 
@@ -40,9 +34,9 @@ export default async function Home() {
         <div className="min-h-screen flex flex-col">
             <CityRedirect />
             {/* Header / Hero */}
-            <header className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-20 px-4">
+            <header className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-24 px-4">
                 <div className="container mx-auto flex flex-col items-center text-center">
-                    <h1 className="text-5xl font-bold mb-6 tracking-tight">ZapVitrine</h1>
+                    <h1 className="text-5xl font-bold mb-8 tracking-tight">ZapVitrine</h1>
                     <p className="text-xl mb-8 max-w-2xl opacity-90">
                         Descubra as melhores lojas da sua cidade. Peça direto no WhatsApp.
                         Simples, rápido e sem taxas escondidas.

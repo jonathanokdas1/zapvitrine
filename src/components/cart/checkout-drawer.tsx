@@ -6,26 +6,30 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ShoppingBag, Trash2, ArrowRight, ArrowLeft } from "lucide-react"
-import { useCart } from "./cart-context"
+import { useCart } from "@/contexts/cart-context"
 import { formatCurrency } from "@/lib/utils"
 import { createWhatsAppMessage, getWhatsAppLink } from "@/lib/whatsapp"
+import { usePathname } from "next/navigation"
+import { trackWhatsAppClick } from "@/actions/analytics"
+import { toast } from "sonner"
 
 export function CheckoutDrawer() {
-    const { items, removeFromCart, clearCart, total } = useCart()
-    const [isOpen, setIsOpen] = React.useState(false)
+    const { state, removeItem, clearCart, toggleCart, total } = useCart()
+    const { items, isOpen } = state
     const [step, setStep] = React.useState(1)
     const [loadingCep, setLoadingCep] = React.useState(false)
+    const pathname = usePathname()
 
+    // Address fields
     const [customerName, setCustomerName] = React.useState("")
     const [cep, setCep] = React.useState("")
     const [addressNumber, setAddressNumber] = React.useState("")
     const [addressComplement, setAddressComplement] = React.useState("")
-
-    // Address fields from API
     const [street, setStreet] = React.useState("")
     const [neighborhood, setNeighborhood] = React.useState("")
     const [city, setCity] = React.useState("")
 
+    // Load saved address
     React.useEffect(() => {
         const savedName = localStorage.getItem("customerName")
         const savedCep = localStorage.getItem("customerCep")
@@ -44,6 +48,10 @@ export function CheckoutDrawer() {
         if (savedCity) setCity(savedCity)
     }, [])
 
+    if (pathname.startsWith("/painel") || pathname.startsWith("/login") || pathname.startsWith("/register") || pathname.startsWith("/forgot-password")) {
+        return null
+    }
+
     const handleCepBlur = async () => {
         const cleanCep = cep.replace(/\D/g, "")
         if (cleanCep.length === 8) {
@@ -56,7 +64,6 @@ export function CheckoutDrawer() {
                     setNeighborhood(data.bairro)
                     setCity(data.localidade)
 
-                    // Save to local storage
                     localStorage.setItem("customerStreet", data.logradouro)
                     localStorage.setItem("customerNeighborhood", data.bairro)
                     localStorage.setItem("customerCity", data.localidade)
@@ -69,13 +76,28 @@ export function CheckoutDrawer() {
         }
     }
 
-    const handleCheckout = () => {
+    const formatCep = (value: string) => {
+        return value
+            .replace(/\D/g, "")
+            .replace(/(\d{5})(\d)/, "$1-$2")
+            .substr(0, 9)
+    }
+
+
+    // ...
+
+    const handleCheckout = async () => {
         if (!customerName || !street || !addressNumber) {
-            alert("Por favor preencha os campos obrigatórios")
+            toast.error("Por favor preencha os campos obrigatórios")
             return
         }
 
-        // Save details
+        const storeCity = items[0]?.storeCity
+        if (storeCity && city && storeCity.toLowerCase().trim() !== city.toLowerCase().trim()) {
+            toast.warning(`Esta loja só realiza entregas em ${storeCity}.`)
+            return
+        }
+
         localStorage.setItem("customerName", customerName)
         localStorage.setItem("customerCep", cep)
         localStorage.setItem("customerNumber", addressNumber)
@@ -92,24 +114,28 @@ export function CheckoutDrawer() {
             storePhone: items[0]?.storePhone || ""
         }
 
-        const message = createWhatsAppMessage(orderDetails)
+        let message = createWhatsAppMessage(orderDetails)
+
+        // Append branding for FREE plan
+        if (items[0]?.storePlan === "FREE") {
+            message += "\n\n_Pedido feito via ZapVitrine_"
+        }
+
         const link = getWhatsAppLink(items[0]?.storePhone || "", message)
+
+        // Track click
+        if (items[0]?.storeSlug) {
+            await trackWhatsAppClick(items[0].storeSlug, total)
+        }
 
         window.open(link, "_blank")
         clearCart()
-        setIsOpen(false)
+        toggleCart() // Close cart
         setStep(1)
     }
 
-    const formatCep = (value: string) => {
-        return value
-            .replace(/\D/g, "")
-            .replace(/(\d{5})(\d)/, "$1-$2")
-            .substr(0, 9)
-    }
-
     return (
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <Sheet open={isOpen} onOpenChange={toggleCart}>
             <SheetTrigger asChild>
                 <Button className="fixed bottom-4 right-4 h-14 w-14 rounded-full shadow-lg z-50" size="icon">
                     <ShoppingBag className="h-6 w-6" />
@@ -141,7 +167,7 @@ export function CheckoutDrawer() {
                                             <div className="flex-1">
                                                 <h4 className="font-medium">{item.quantity}x {item.title}</h4>
                                                 <div className="text-sm text-muted-foreground">
-                                                    {item.variants.map((v, i) => (
+                                                    {item.selected_variants && item.selected_variants.map((v, i) => (
                                                         <div key={i}>{v}</div>
                                                     ))}
                                                 </div>
@@ -153,7 +179,7 @@ export function CheckoutDrawer() {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="text-red-500"
-                                                onClick={() => removeFromCart(item.id)}
+                                                onClick={() => removeItem(item.id)}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -223,6 +249,7 @@ export function CheckoutDrawer() {
                                             <Input
                                                 id="neighborhood"
                                                 value={neighborhood}
+                                                onChange={(e) => setNeighborhood(e.target.value)}
                                                 readOnly={!!neighborhood}
                                                 className={neighborhood ? "bg-gray-50" : ""}
                                             />
@@ -232,11 +259,17 @@ export function CheckoutDrawer() {
                                             <Input
                                                 id="city"
                                                 value={city}
+                                                onChange={(e) => setCity(e.target.value)}
                                                 readOnly={!!city}
                                                 className={city ? "bg-gray-50" : ""}
                                             />
                                         </div>
                                     </div>
+                                    {items[0]?.storeCity && city && items[0].storeCity.toLowerCase().trim() !== city.toLowerCase().trim() && (
+                                        <div className="text-sm text-red-500 bg-red-50 p-2 rounded-md border border-red-200">
+                                            Atenção: Esta loja está localizada em <strong>{items[0].storeCity}</strong> e pode não entregar no seu endereço.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </>

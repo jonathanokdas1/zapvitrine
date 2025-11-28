@@ -2,7 +2,7 @@
 
 import { getSession } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { getCategoryInfo } from "@/config/categories"
 import { redirect } from "next/navigation"
 
@@ -84,8 +84,9 @@ export async function updateStoreSettings(formData: FormData) {
         }
     }
 
+
     // Update user
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: {
             logo_url,
@@ -97,11 +98,21 @@ export async function updateStoreSettings(formData: FormData) {
             store_type,
             ...(slug ? { slug } : {}), // Only update slug if provided
             business: {
-                update: {
-                    is_open,
-                    consumption_mode,
-                    opening_hours,
-                    schedule
+                upsert: {
+                    create: {
+                        is_open,
+                        consumption_mode,
+                        opening_hours,
+                        schedule,
+                        category: store_type
+                    },
+                    update: {
+                        is_open,
+                        consumption_mode,
+                        opening_hours,
+                        schedule,
+                        category: store_type
+                    }
                 }
             },
             location: {
@@ -113,6 +124,8 @@ export async function updateStoreSettings(formData: FormData) {
         }
     })
 
-    revalidatePath("/admin/settings")
+    // @ts-ignore - Next.js 16 signature mismatch
+    revalidateTag(`store-${updatedUser.slug}`)
+    revalidatePath("/painel/configuracao")
     return { success: true }
 }

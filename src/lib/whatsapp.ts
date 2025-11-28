@@ -6,6 +6,7 @@ export interface CartItem {
     price: number
     variants?: string[]
     storeType?: string
+    isService?: boolean
 }
 
 export interface OrderDetails {
@@ -19,16 +20,18 @@ export interface OrderDetails {
 
 export function createWhatsAppMessage(order: OrderDetails): string {
     const { storeName, items, total, address, customerName } = order
-    const isService = items[0]?.storeType === "SERVICE"
 
-    let message = `*${isService ? "Novo Agendamento" : "Novo Pedido"} para ${storeName}*\n\n`
+    // Check if any item is a service or if store type is service
+    const hasService = items.some(item => item.isService || item.storeType === "SERVICE")
+
+    let message = `*${hasService ? "Novo Agendamento" : "Novo Pedido"} para ${storeName}*\n\n`
 
     if (customerName) {
         message += `Cliente: ${customerName}\n`
     }
     message += `Endereço: ${address}\n\n`
 
-    message += `*${isService ? "Serviços" : "Itens"}:*\n`
+    message += `*${hasService ? "Serviços/Itens" : "Itens"}:*\n`
     items.forEach(item => {
         message += `${item.quantity}x ${item.title}`
         if (item.variants && item.variants.length > 0) {

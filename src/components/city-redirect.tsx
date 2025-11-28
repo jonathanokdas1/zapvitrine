@@ -1,17 +1,21 @@
 "use client"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export function CityRedirect() {
     const router = useRouter()
+    const searchParams = useSearchParams()
 
     useEffect(() => {
+        const isManualMode = searchParams.get('manual') === 'true'
+        if (isManualMode) return
+
         const savedCitySlug = localStorage.getItem("zap_city_slug")
         if (savedCitySlug) {
-            router.push(`/cidade/${savedCitySlug}`)
+            router.push(`/${savedCitySlug}`)
         }
-    }, [router])
+    }, [router, searchParams])
 
     return null
 }

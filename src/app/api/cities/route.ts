@@ -12,19 +12,25 @@ export async function GET(request: Request) {
         return NextResponse.json([])
     }
 
+    // Normalize query to remove accents (NFD -> Remove Diacritics)
+    // This ensures "Concórdia" becomes "Concordia" before searching
+    const normalizedQuery = query.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
     try {
-        // Busca no banco de dados (SQLite)
-        const cities = await prisma.city.findMany({
-            where: {
-                name: {
-                    contains: query, // Procura cidades que CONTÊM o texto
-                },
-            },
-            take: 20, // Limita a 20 resultados para ser rápido
-            orderBy: {
-                name: 'asc' // Ordena alfabeticamente
-            }
-        })
+        // Busca no banco de dados (Postgres com unaccent)
+        // O Prisma não suporta nativamente unaccent no findMany, então usamos raw query
+        const cities = await prisma.$queryRaw`
+            SELECT * FROM "City"
+            WHERE unaccent(name) ILIKE unaccent(${'%' + normalizedQuery + '%'})
+            ORDER BY 
+                CASE 
+                    WHEN unaccent(name) ILIKE unaccent(${normalizedQuery}) THEN 1 
+                    WHEN unaccent(name) ILIKE unaccent(${normalizedQuery + '%'}) THEN 2 
+                    ELSE 3 
+                END,
+                name ASC
+            LIMIT 20
+        `
 
         return NextResponse.json(cities)
     } catch (error) {

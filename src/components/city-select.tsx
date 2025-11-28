@@ -25,7 +25,7 @@ interface City {
     slug: string
 }
 
-export function CitySelect() {
+export function CitySelect({ onSelect }: { onSelect?: (city: City) => void }) {
     const [open, setOpen] = React.useState(false)
     const [value, setValue] = React.useState("")
     const [selectedCityId, setSelectedCityId] = React.useState("")
@@ -81,6 +81,7 @@ export function CitySelect() {
                                             setValue(`${city.name} - ${city.state}`)
                                             setSelectedCityId(city.id)
                                             setOpen(false)
+                                            onSelect?.(city)
                                         }}
                                     >
                                         <Check

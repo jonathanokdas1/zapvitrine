@@ -4,8 +4,8 @@ import { notFound } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { STORE_CATEGORIES } from "@/config/categories"
-import { Store, MapPin } from "lucide-react"
-import { ChangeCityButton } from "@/components/change-city-button"
+import { Store, MapPin, BadgeCheck } from "lucide-react"
+import { CitySwitcher } from "@/components/location/city-switcher"
 import { checkStoreOpen } from "@/lib/utils"
 
 const prisma = new PrismaClient()
@@ -18,10 +18,19 @@ export default async function CityPage({ params, searchParams }: { params: Promi
         where: { slug: citySlug },
         include: {
             locations: {
+                where: {
+                    user: {
+                        products: {
+                            some: {}
+                        },
+                        emailVerified: { not: null }
+                    }
+                },
                 include: {
                     user: {
                         include: {
-                            business: true
+                            business: true,
+                            plan: true
                         }
                     }
                 }
@@ -39,16 +48,28 @@ export default async function CityPage({ params, searchParams }: { params: Promi
         stores = stores.filter(store => store.store_type === type)
     }
 
+    // Sort by Plan (PRO first), then Verified (true first)
+    stores.sort((a, b) => {
+        const isProA = a.plan?.plan === 'PRO'
+        const isProB = b.plan?.plan === 'PRO'
+
+        if (isProA && !isProB) return -1
+        if (!isProA && isProB) return 1
+
+        if (a.verified === b.verified) return 0
+        return a.verified ? -1 : 1
+    })
+
     return (
         <div className="min-h-screen bg-gray-50">
             <header className="bg-white border-b sticky top-0 z-10">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <Link href="/" className="font-bold text-xl text-primary">ZapVitrine</Link>
+                        <Link href="/?manual=true" className="font-bold text-xl text-primary">ZapVitrine</Link>
                         <span className="text-gray-300">|</span>
                         <span className="font-medium">{city.name}</span>
                     </div>
-                    <ChangeCityButton />
+                    <CitySwitcher currentCityName={city.name} />
                 </div>
                 <div className="container mx-auto px-4 py-2 flex gap-2 overflow-x-auto no-scrollbar">
                     <Link href={`/${citySlug}`}>
@@ -88,8 +109,9 @@ export default async function CityPage({ params, searchParams }: { params: Promi
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
+                                            <h3 className="font-semibold truncate group-hover:text-primary transition-colors flex items-center gap-1">
                                                 {store.name}
+                                                {store.verified && <BadgeCheck className="w-4 h-4 text-blue-500 fill-blue-50" />}
                                             </h3>
                                             <p className="text-sm text-muted-foreground truncate">
                                                 {store.description || "Sem descrição"}

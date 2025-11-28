@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest) {
     const session = request.cookies.get('session')?.value
 
     // 1. Check if the route is protected (starts with /admin)
-    if (request.nextUrl.pathname.startsWith('/admin')) {
+    if (request.nextUrl.pathname.startsWith("/painel")) {
         // 2. Check for valid session
         if (!session) {
             return NextResponse.redirect(new URL('/login', request.url))
@@ -34,5 +34,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/admin/:path*'],
+    matcher: ["/painel/:path*", "/login", "/register", "/forgot-password"],
 }

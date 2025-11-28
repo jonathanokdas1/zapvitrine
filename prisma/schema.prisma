@@ -1,9 +1,10 @@
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -19,6 +20,12 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   password_hash String
+  
+  // Auth
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+  emailVerified    DateTime?
+  emailVerificationToken String? @unique
   
   // Profile
   name          String    // Store Name
@@ -38,12 +45,17 @@ model User {
   views           Int @default(0)
   clicks_whatsapp Int @default(0)
   
+  // Trust & Safety
+  verified        Boolean @default(false)
+  blocked         Boolean @default(false)
+  
   // Relations
   location      Location?
   business      Business?
   plan          Plan?
   metrics       Metrics?
   products      Product[]
+  analytics     AnalyticsDay[]
   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -92,10 +104,27 @@ model Product {
   images      String   // JSON array of URLs
   variants    String   // JSON: [{ name: "Size", type: "SELECT", options: [...] }]
   is_active   Boolean  @default(true)
+  is_service  Boolean  @default(false)
+  views       Int      @default(0)
   
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model AnalyticsDay {
+  id        String   @id @default(cuid())
+  date      DateTime // Only the date part matters, or set time to 00:00:00
+  views     Int      @default(0)
+  clicks    Int      @default(0)
+  cart_adds Int      @default(0)
+  revenue_potential Int @default(0) // In cents
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([date, userId])
+  @@index([date])
 }

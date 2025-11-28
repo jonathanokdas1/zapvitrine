@@ -2,12 +2,17 @@
 
 import { PrismaClient } from "@prisma/client"
 import { redirect } from "next/navigation"
+import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { login as authLogin, getSession } from "@/lib/auth"
+import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient()
 
 import { validateCPF } from "@/lib/validators"
+import { sendVerificationEmail } from "@/lib/email"
+import { emailQueue } from "@/lib/queue"
+import crypto from "crypto"
 
 const registerSchema = z.object({
     name: z.string().min(3),
@@ -68,7 +73,7 @@ export async function registerStore(prevState: any, formData: FormData) {
         const newUser = await prisma.user.create({
             data: {
                 email,
-                password_hash: password, // In real app, hash this!
+                password_hash: await bcrypt.hash(password, 10),
                 name: storeName,
                 owner_name: name,
                 slug: storeSlug,
@@ -98,12 +103,63 @@ export async function registerStore(prevState: any, formData: FormData) {
         // Login after register
         await authLogin(newUser.id)
 
+        // Send verification email
+        const token = crypto.randomBytes(32).toString("hex")
+        await prisma.user.update({
+            where: { id: newUser.id },
+            data: { emailVerificationToken: token }
+        })
+        // await sendVerificationEmail(email, token)
+        await emailQueue.add('verification', { type: 'verification', data: { email, token } })
+
     } catch (e) {
         console.error(e)
         return { error: "Algo deu errado. Tente novamente." }
     }
 
-    redirect("/admin")
+    redirect("/painel")
+}
+
+export async function verifyEmail(token: string) {
+    const user = await prisma.user.findUnique({
+        where: { emailVerificationToken: token }
+    })
+
+    if (!user) {
+        return { error: "Token inválido ou expirado." }
+    }
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: {
+            emailVerified: new Date(),
+            emailVerificationToken: null
+        }
+    })
+
+    return { success: true }
+}
+
+export async function resendVerificationEmail() {
+    const session = await getSession()
+    if (!session) return { error: "Não autorizado" }
+
+    const user = await prisma.user.findUnique({
+        where: { id: session.userId }
+    })
+
+    if (!user) return { error: "Usuário não encontrado" }
+    if (user.emailVerified) return { error: "Email já verificado" }
+
+    const token = crypto.randomBytes(32).toString("hex")
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerificationToken: token }
+    })
+
+    // await sendVerificationEmail(user.email, token)
+    await emailQueue.add('verification', { type: 'verification', data: { email: user.email, token } })
+    return { success: true, message: "Email enviado!" }
 }
 
 export async function login(prevState: any, formData: FormData) {
@@ -119,7 +175,13 @@ export async function login(prevState: any, formData: FormData) {
             where: { email }
         })
 
-        if (!user || user.password_hash !== password) {
+        if (!user) {
+            return { error: "Email ou senha inválidos." }
+        }
+
+        const isValid = await bcrypt.compare(password, user.password_hash)
+
+        if (!isValid) {
             return { error: "Email ou senha inválidos." }
         }
 
@@ -130,7 +192,7 @@ export async function login(prevState: any, formData: FormData) {
         return { error: "Erro ao fazer login." }
     }
 
-    redirect("/admin")
+    redirect("/painel")
 }
 
 export async function createProduct(formData: FormData) {
@@ -145,6 +207,26 @@ export async function createProduct(formData: FormData) {
     const session = await getSession()
     if (!session) redirect('/login')
 
+    const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        include: {
+            plan: true,
+            location: {
+                include: { city: true }
+            }
+        }
+    })
+
+    if (!user) redirect('/login')
+
+    const plan = user.plan?.plan || "FREE"
+    const maxImages = plan === "FREE" ? 1 : 5
+    const imageList = JSON.parse(images)
+
+    if (imageList.length > maxImages) {
+        throw new Error(`Limite de imagens excedido. Seu plano permite apenas ${maxImages} imagem(ns).`)
+    }
+
     await prisma.product.create({
         data: {
             title,
@@ -157,7 +239,11 @@ export async function createProduct(formData: FormData) {
         }
     })
 
-    redirect('/admin/products?success=true')
+    if (user.location?.city?.slug && user.slug) {
+        revalidatePath(`/${user.location.city.slug}/${user.slug}`)
+    }
+
+    redirect('/painel/produtos?success=true')
 }
 
 export async function updateProduct(formData: FormData) {
@@ -173,9 +259,29 @@ export async function updateProduct(formData: FormData) {
     const session = await getSession()
     if (!session) redirect('/login')
 
+    const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        include: {
+            plan: true,
+            location: {
+                include: { city: true }
+            }
+        }
+    })
+
+    if (!user) redirect('/login')
+
     const product = await prisma.product.findUnique({ where: { id } })
     if (!product || product.userId !== session.userId) {
         throw new Error("Unauthorized")
+    }
+
+    const plan = user.plan?.plan || "FREE"
+    const maxImages = plan === "FREE" ? 1 : 5
+    const imageList = JSON.parse(images)
+
+    if (imageList.length > maxImages) {
+        throw new Error(`Limite de imagens excedido. Seu plano permite apenas ${maxImages} imagem(ns).`)
     }
 
     await prisma.product.update({
@@ -190,5 +296,9 @@ export async function updateProduct(formData: FormData) {
         }
     })
 
-    redirect('/admin/products?success=true')
+    if (user.location?.city?.slug && user.slug) {
+        revalidatePath(`/${user.location.city.slug}/${user.slug}`)
+    }
+
+    redirect('/painel/produtos?success=true')
 }

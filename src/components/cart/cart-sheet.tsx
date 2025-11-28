@@ -13,12 +13,14 @@ import {
     SheetTrigger,
     SheetFooter,
 } from "@/components/ui/sheet"
-import { useCart } from "./cart-context"
+import { useCart } from "@/contexts/cart-context"
 import { formatCurrency } from "@/lib/utils"
 import { createWhatsAppMessage, getWhatsAppLink } from "@/lib/whatsapp"
+import { toast } from "sonner"
 
 export function CartSheet() {
-    const { items, removeFromCart, total, clearCart } = useCart()
+    const { state, removeItem, total, clearCart } = useCart()
+    const { items } = state
     const [address, setAddress] = React.useState("")
     const [name, setName] = React.useState("")
     const [isOpen, setIsOpen] = React.useState(false)
@@ -32,7 +34,7 @@ export function CartSheet() {
 
     const handleCheckout = () => {
         if (!address) {
-            alert("Please enter your address")
+            toast.error("Please enter your address")
             return
         }
 
@@ -78,16 +80,16 @@ export function CartSheet() {
                         <div key={item.id} className="flex justify-between items-start border-b pb-4">
                             <div>
                                 <p className="font-medium">{item.quantity}x {item.title}</p>
-                                {item.variants.length > 0 && (
+                                {item.selected_variants.length > 0 && (
                                     <p className="text-sm text-muted-foreground">
-                                        {item.variants.join(", ")}
+                                        {item.selected_variants.join(", ")}
                                     </p>
                                 )}
                                 <p className="text-sm font-medium mt-1">
                                     {formatCurrency(item.price * item.quantity)}
                                 </p>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)}>
+                            <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}>
                                 <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
                         </div>
